@@ -71,12 +71,22 @@
   .filters select{background:var(--panel-2); border:1px solid var(--border); color:var(--text); font-size:12px; border-radius:6px; padding:6px 8px;}
   .stat-section-title{font-size:13px; font-weight:600; margin:20px 0 10px; color:var(--text);}
   .stat-section-title:first-child{margin-top:0;}
+  .stat-section-title.repeat{color:var(--warn);}
+
+  .method-row{display:flex; flex-wrap:wrap; gap:10px; align-items:end; padding:10px 0; border-top:1px dashed var(--border);}
+  .method-row:first-child{border-top:none; padding-top:0;}
+  #method-rows-container{margin-bottom:2px;}
+  .btn-add-method-wrap{margin:10px 0 14px;}
+  .checkbox-field{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-2); cursor:pointer; margin-top:7px; white-space:nowrap;}
+  .checkbox-field input{width:auto; cursor:pointer;}
+  .badge-repeat{font-size:10px; background:var(--panel-2); border:1px solid var(--warn); color:var(--warn); border-radius:4px; padding:1px 5px; margin-left:6px; white-space:nowrap; vertical-align:middle;}
+  td.bm-cell{vertical-align:top;}
 </style>
 </head>
 <body>
 
 <h1>Трекер заливу / апілу — TikTok Ads</h1>
-<p class="sub">Один рядок = одна партія на БМ (30–45 РК), заведена одним методом заливу + одним методом апілу</p>
+<p class="sub">Один запис = один БМ (30–45 РК). До одного БМ можна додати кілька методів заливу/апілу через «+ Метод».</p>
 
 <div class="card" id="config-card">
   <div class="field" style="max-width:640px;">
@@ -96,7 +106,7 @@
 
 <div class="panel active" id="panel-log">
   <div class="card">
-    <div class="form-grid">
+    <div class="form-grid" style="margin-bottom:6px;">
       <div class="field field-period">
         <label>Період</label>
         <div class="period-row">
@@ -106,15 +116,24 @@
         </div>
       </div>
       <div class="field field-bm"><label>БМ</label><input type="text" id="f-bm" placeholder="BM-014"></div>
-      <div class="field field-method"><label>Метод заливу</label><input type="text" id="f-zaliv" placeholder="напр. Метод А" list="zaliv-list"></div>
-      <div class="field field-method"><label>Метод апілу</label><input type="text" id="f-apil" placeholder="напр. Апіл №2" list="apil-list"></div>
-      <div class="field field-qty"><label>РК</label><input type="number" id="f-rk" min="0" placeholder="40"></div>
-      <div class="field field-qty"><label>Забанено</label><input type="number" id="f-banned" min="0" placeholder="25"></div>
-      <div class="field field-qty"><label>Розбанено</label><input type="number" id="f-unbanned" min="0" placeholder="18"></div>
-      <div class="field field-notes"><label>Нотатки</label><input type="text" id="f-notes" placeholder="довільно"></div>
+      <div class="field" style="flex:0 0 120px;">
+        <label style="visibility:hidden;">.</label>
+        <label class="checkbox-field">
+          <input type="checkbox" id="f-repeat-apil">
+          Повт. апіл
+        </label>
+      </div>
+    </div>
+
+    <div id="method-rows-container"></div>
+    <div class="btn-add-method-wrap">
+      <button type="button" class="secondary" id="btn-add-method">+ Метод</button>
+    </div>
+
+    <div class="form-grid">
       <div class="field field-submit" style="display:flex; gap:6px;">
         <button id="btn-add" style="width:100%;">Додати запис</button>
-        <button id="btn-cancel-edit" class="secondary" style="display:none; flex:0 0 40px;" title="Скасувати редагування"><i class="ti ti-x"></i>✕</button>
+        <button id="btn-cancel-edit" class="secondary" style="display:none; flex:0 0 40px;" title="Скасувати редагування">✕</button>
       </div>
     </div>
     <datalist id="zaliv-list"></datalist>
@@ -139,7 +158,7 @@
         <thead>
           <tr>
             <th>Дата</th><th>БМ</th><th>Залив</th><th>Апіл</th>
-            <th>РК</th><th>Забанено</th><th>Розбанено</th><th>% розбану</th><th>Нотатки</th><th></th>
+            <th>РК</th><th>Залито</th><th>Забанено</th><th>Розбанено</th><th>% розбану</th><th>Нотатки</th><th></th>
           </tr>
         </thead>
         <tbody id="log-body"></tbody>
@@ -170,11 +189,18 @@
     <tbody id="stats-combo"></tbody></table>
     <div class="empty" id="stats-combo-empty" style="display:none;">Немає даних</div>
   </div>
+
+  <div class="stat-section-title repeat">🔁 Повторні апілі (окремо, не входить в основну статистику вище)</div>
+  <div class="card" style="padding:0;">
+    <table><thead><tr><th>#</th><th>Метод апілу</th><th>Подано повторно (забанено)</th><th>Розбанено</th></tr></thead>
+    <tbody id="stats-repeat-apil"></tbody></table>
+    <div class="empty" id="stats-repeat-apil-empty" style="display:none;">Немає даних</div>
+  </div>
 </div>
 
 <script>
 let entries = [];
-let editingId = null;
+let editingGroupKey = null;
 
 function uid(){ return Math.random().toString(36).slice(2,10); }
 
@@ -188,6 +214,28 @@ function pctCell(value, total){
   if(!total) return '<span style="color:var(--text-3)">—</span>';
   const p = Math.round((value/total)*100);
   return `<div class="pct-wrap"><span class="pct-num" style="min-width:auto; color:var(--text-2);">${value}/${total}</span><div class="pct-bar"><div class="pct-fill" style="width:${p}%; background:${pctColor(p)}"></div></div><span class="pct-num" style="color:${pctColor(p)}">${p}%</span></div>`;
+}
+
+// --- Дата: захист від "лагаючих" дат ---
+// Google Apps Script часто повертає дати як повний ISO datetime (Date-об'єкт із листа),
+// а не як чистий рядок "YYYY-MM-DD". Якщо брати з нього просто перші 10 символів (UTC),
+// дата може "з'їхати" на день назад/вперед через часовий пояс таблиці. Тому тут дата
+// перепарсюється як Date і береться в ЛОКАЛЬНОМУ часовому поясі браузера.
+function normalizeDate(raw){
+  if(raw === null || raw === undefined || raw === '') return '';
+  const s = String(raw);
+  const exact = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(exact) return s;
+  const d = new Date(s);
+  if(isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function toBool(v){
+  return v === true || v === 'true' || v === 'TRUE' || v === 1 || v === '1';
 }
 
 function fmtDate(d){
@@ -205,7 +253,7 @@ function fmtPeriod(e){
 }
 
 const CONFIG_KEY = 'gsheet-script-url';
-const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyKgXmiqyvfTxDv-8fg-fGp7YWcYNeHi9BtMSoXwW5l4D1cXh2p8OjR0yXn4GR7uymQ/exec';
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzFtqnzUmnV_MAq0pL00JjVAV79y1VXSYvY-VI2zYTjOa5Qy4HRfXC9eU7E9IlTgDLw/exec';
 let SCRIPT_URL = localStorage.getItem(CONFIG_KEY) || DEFAULT_SCRIPT_URL;
 
 function setStatus(msg, isError){
@@ -240,12 +288,15 @@ async function loadEntries(){
     const raw = await apiGet();
     entries = raw.map(r=>({
       id: String(r.id),
-      dateFrom: r.dateFrom || '',
-      dateTo: r.dateTo || '',
+      groupId: r.groupId ? String(r.groupId) : '',
+      dateFrom: normalizeDate(r.dateFrom),
+      dateTo: normalizeDate(r.dateTo),
       bm: r.bm || '',
+      repeatApil: toBool(r.repeatApil),
       zaliv: r.zaliv || '',
       apil: r.apil || '',
       rk: Number(r.rk||0),
+      zalito: Number(r.zalito||0),
       banned: Number(r.banned||0),
       unbanned: Number(r.unbanned||0),
       notes: r.notes || ''
@@ -278,29 +329,56 @@ function fillFilterSelect(el, values, placeholder){
   if(values.includes(current)) el.value = current;
 }
 
+// --- Групування рядків одного БМ (кілька методів заливу/апілу в одному записі) ---
+function groupKey(e){ return e.groupId || e.id; }
+
+function groupEntries(list){
+  const map = new Map();
+  const order = [];
+  list.forEach(e=>{
+    const k = groupKey(e);
+    if(!map.has(k)){ map.set(k, []); order.push(k); }
+    map.get(k).push(e);
+  });
+  return order.map(k=>({key:k, rows:map.get(k)}));
+}
+
 function renderLog(){
   const zFilter = document.getElementById('filter-zaliv').value;
   const aFilter = document.getElementById('filter-apil').value;
   const tbody = document.getElementById('log-body');
   const filtered = entries.filter(e => (!zFilter || e.zaliv===zFilter) && (!aFilter || e.apil===aFilter));
+  const groups = groupEntries(filtered);
 
-  tbody.innerHTML = filtered.map(e=>{
-    return `<tr>
-      <td>${fmtPeriod(e)}</td>
-      <td>${e.bm||'—'}</td>
-      <td class="name-cell">${e.zaliv||'—'}</td>
-      <td class="name-cell">${e.apil||'—'}</td>
-      <td>${e.rk}</td>
-      <td>${e.banned}</td>
-      <td>${e.unbanned}</td>
-      <td>${pctCell(e.unbanned, e.banned)}</td>
-      <td class="note-cell" title="${(e.notes||'').replace(/"/g,'&quot;')}">${e.notes||''}</td>
-      <td style="white-space:nowrap;">
-        <button class="icon" onclick="startEdit('${e.id}')" title="Редагувати"><i class="ti ti-edit"></i>✎</button>
-        <button class="icon" onclick="removeEntry('${e.id}')" title="Видалити"><i class="ti ti-x"></i>✕</button>
-      </td>
-    </tr>`;
-  }).join('');
+  let html = '';
+  groups.forEach(g=>{
+    const rows = g.rows;
+    const rowspan = rows.length;
+    rows.forEach((e, idx)=>{
+      html += '<tr>';
+      if(idx===0){
+        const badge = e.repeatApil ? '<span class="badge-repeat" title="Повторний апіл">🔁 повтор</span>' : '';
+        html += `<td class="bm-cell" rowspan="${rowspan}">${fmtPeriod(e)}</td>`;
+        html += `<td class="bm-cell" rowspan="${rowspan}">${e.bm||'—'}${badge}</td>`;
+      }
+      html += `<td class="name-cell">${e.zaliv||'—'}</td>`;
+      html += `<td class="name-cell">${e.apil||'—'}</td>`;
+      html += `<td>${e.rk||0}</td>`;
+      html += `<td>${e.zalito||0}</td>`;
+      html += `<td>${e.banned||0}</td>`;
+      html += `<td>${e.unbanned||0}</td>`;
+      html += `<td>${pctCell(e.unbanned, e.banned)}</td>`;
+      html += `<td class="note-cell" title="${(e.notes||'').replace(/"/g,'&quot;')}">${e.notes||''}</td>`;
+      html += `<td style="white-space:nowrap;">`;
+      if(idx===0){
+        html += `<button class="icon" onclick="startEditGroup('${g.key}')" title="Редагувати запис">✎</button>`;
+      }
+      html += `<button class="icon" onclick="removeEntry('${e.id}')" title="Видалити цей метод">✕</button>`;
+      html += `</td>`;
+      html += '</tr>';
+    });
+  });
+  tbody.innerHTML = html;
 
   document.getElementById('log-empty').style.display = filtered.length ? 'none' : 'block';
   document.getElementById('log-table').style.display = filtered.length ? 'table' : 'none';
@@ -313,9 +391,9 @@ function renderLog(){
   fillFilterSelect(document.getElementById('filter-apil'), apils, 'Всі методи апілу');
 }
 
-function groupBy(keyFn){
+function groupBy(list, keyFn){
   const map = {};
-  entries.forEach(e=>{
+  list.forEach(e=>{
     const k = keyFn(e);
     if(!k) return;
     if(!map[k]) map[k] = [];
@@ -325,7 +403,11 @@ function groupBy(keyFn){
 }
 
 function renderStats(){
-  const byZaliv = groupBy(e=>e.zaliv);
+  // Записи з повторним апілом рахуються окремо і не впливають на основну статистику
+  const mainEntries = entries.filter(e=>!e.repeatApil);
+  const repeatEntries = entries.filter(e=>e.repeatApil);
+
+  const byZaliv = groupBy(mainEntries, e=>e.zaliv);
   const zalivRows = Object.entries(byZaliv).map(([name, list])=>{
     const totalRk = list.reduce((s,e)=>s+Number(e.rk||0),0);
     const totalBanned = list.reduce((s,e)=>s+Number(e.banned||0),0);
@@ -342,7 +424,7 @@ function renderStats(){
   </tr>`).join('');
   document.getElementById('stats-zaliv-empty').style.display = zalivRows.length ? 'none' : 'block';
 
-  const byApil = groupBy(e=>e.apil);
+  const byApil = groupBy(mainEntries, e=>e.apil);
   const apilRows = Object.entries(byApil).map(([name, list])=>{
     const totalBanned = list.reduce((s,e)=>s+Number(e.banned||0),0);
     const totalUnbanned = list.reduce((s,e)=>s+Number(e.unbanned||0),0);
@@ -358,7 +440,7 @@ function renderStats(){
   </tr>`).join('');
   document.getElementById('stats-apil-empty').style.display = apilRows.length ? 'none' : 'block';
 
-  const byCombo = groupBy(e => (e.zaliv && e.apil) ? `${e.zaliv} + ${e.apil}` : null);
+  const byCombo = groupBy(mainEntries, e => (e.zaliv && e.apil) ? `${e.zaliv} + ${e.apil}` : null);
   const comboRows = Object.entries(byCombo).map(([name, list])=>{
     const totalRk = list.reduce((s,e)=>s+Number(e.rk||0),0);
     const totalBanned = list.reduce((s,e)=>s+Number(e.banned||0),0);
@@ -375,6 +457,23 @@ function renderStats(){
     <td>${pctCell(r.aliveEnd, r.totalRk)}</td>
   </tr>`).join('');
   document.getElementById('stats-combo-empty').style.display = comboRows.length ? 'none' : 'block';
+
+  // Окрема статистика повторних апілів
+  const byRepeatApil = groupBy(repeatEntries, e=>e.apil);
+  const repeatRows = Object.entries(byRepeatApil).map(([name, list])=>{
+    const totalBanned = list.reduce((s,e)=>s+Number(e.banned||0),0);
+    const totalUnbanned = list.reduce((s,e)=>s+Number(e.unbanned||0),0);
+    return {name, count:list.length, totalBanned, totalUnbanned};
+  }).sort((a,b)=> (b.totalUnbanned/(b.totalBanned||1)) - (a.totalUnbanned/(a.totalBanned||1)));
+
+  const rBody = document.getElementById('stats-repeat-apil');
+  rBody.innerHTML = repeatRows.map((r,i)=>`<tr>
+    <td class="rank">${i+1}</td>
+    <td class="name-cell">${r.name}</td>
+    <td class="count-cell">${r.totalBanned}</td>
+    <td>${pctCell(r.totalUnbanned, r.totalBanned)}</td>
+  </tr>`).join('');
+  document.getElementById('stats-repeat-apil-empty').style.display = repeatRows.length ? 'none' : 'block';
 }
 
 function render(){
@@ -389,29 +488,69 @@ window.removeEntry = async function(id){
   await loadEntries();
 }
 
-window.startEdit = function(id){
-  const e = entries.find(x=>x.id===id);
-  if(!e) return;
-  editingId = id;
-  document.getElementById('f-date-from').value = e.dateFrom||'';
-  document.getElementById('f-date-to').value = e.dateTo||'';
-  document.getElementById('f-bm').value = e.bm||'';
-  document.getElementById('f-zaliv').value = e.zaliv||'';
-  document.getElementById('f-apil').value = e.apil||'';
-  document.getElementById('f-rk').value = e.rk||'';
-  document.getElementById('f-banned').value = e.banned||'';
-  document.getElementById('f-unbanned').value = e.unbanned||'';
-  document.getElementById('f-notes').value = e.notes||'';
+// --- Динамічні рядки методів заливу/апілу всередині одного запису БМ ---
+function methodRowTemplate(m){
+  m = m || {};
+  return `<div class="method-row" data-id="${m.id||''}">
+    <div class="field field-method"><label>Метод заливу</label><input type="text" class="m-zaliv" list="zaliv-list" value="${(m.zaliv||'').replace(/"/g,'&quot;')}"></div>
+    <div class="field field-method"><label>Метод апілу</label><input type="text" class="m-apil" list="apil-list" value="${(m.apil||'').replace(/"/g,'&quot;')}"></div>
+    <div class="field field-qty"><label>РК</label><input type="number" class="m-rk" min="0" value="${m.rk||''}"></div>
+    <div class="field field-qty"><label>Залито</label><input type="number" class="m-zalito" min="0" value="${m.zalito||''}"></div>
+    <div class="field field-qty"><label>Забанено</label><input type="number" class="m-banned" min="0" value="${m.banned||''}"></div>
+    <div class="field field-qty"><label>Розбанено</label><input type="number" class="m-unbanned" min="0" value="${m.unbanned||''}"></div>
+    <div class="field field-notes"><label>Нотатки</label><input type="text" class="m-notes" value="${(m.notes||'').replace(/"/g,'&quot;')}"></div>
+    <div class="field" style="flex:0 0 40px;">
+      <label style="visibility:hidden;">.</label>
+      <button type="button" class="icon btn-remove-method" title="Видалити цей метод">✕</button>
+    </div>
+  </div>`;
+}
+
+function setMethodRows(list){
+  const container = document.getElementById('method-rows-container');
+  const rows = (list && list.length) ? list : [{}];
+  container.innerHTML = rows.map(methodRowTemplate).join('');
+}
+
+document.getElementById('method-rows-container').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.btn-remove-method');
+  if(!btn) return;
+  const container = document.getElementById('method-rows-container');
+  const row = btn.closest('.method-row');
+  if(container.querySelectorAll('.method-row').length > 1){
+    row.remove();
+  } else {
+    row.querySelectorAll('input').forEach(inp=>inp.value='');
+    row.dataset.id = '';
+  }
+});
+
+document.getElementById('btn-add-method').addEventListener('click', ()=>{
+  document.getElementById('method-rows-container').insertAdjacentHTML('beforeend', methodRowTemplate({}));
+});
+
+setMethodRows([{}]);
+
+window.startEditGroup = function(key){
+  const rows = entries.filter(e => groupKey(e) === key);
+  if(!rows.length) return;
+  editingGroupKey = key;
+  const first = rows[0];
+  document.getElementById('f-date-from').value = first.dateFrom||'';
+  document.getElementById('f-date-to').value = first.dateTo||'';
+  document.getElementById('f-bm').value = first.bm||'';
+  document.getElementById('f-repeat-apil').checked = !!first.repeatApil;
+  setMethodRows(rows.map(e=>({id:e.id, zaliv:e.zaliv, apil:e.apil, rk:e.rk, zalito:e.zalito, banned:e.banned, unbanned:e.unbanned, notes:e.notes})));
   document.getElementById('btn-add').textContent = 'Зберегти зміни';
   document.getElementById('btn-cancel-edit').style.display = 'inline-flex';
   document.getElementById('btn-add').scrollIntoView({behavior:'smooth', block:'center'});
 }
 
 function resetForm(){
-  editingId = null;
-  ['f-bm','f-zaliv','f-apil','f-rk','f-banned','f-unbanned','f-notes','f-date-from','f-date-to'].forEach(id=>{
-    document.getElementById(id).value='';
-  });
+  editingGroupKey = null;
+  ['f-bm','f-date-from','f-date-to'].forEach(id=>{ document.getElementById(id).value=''; });
+  document.getElementById('f-repeat-apil').checked = false;
+  setMethodRows([{}]);
   document.getElementById('btn-add').textContent = 'Додати запис';
   document.getElementById('btn-cancel-edit').style.display = 'none';
 }
@@ -424,22 +563,49 @@ document.getElementById('btn-add').addEventListener('click', async ()=>{
   const dateFrom = document.getElementById('f-date-from').value;
   const dateTo = document.getElementById('f-date-to').value;
   const bm = document.getElementById('f-bm').value.trim();
-  const zaliv = document.getElementById('f-zaliv').value.trim();
-  const apil = document.getElementById('f-apil').value.trim();
-  const rk = Number(document.getElementById('f-rk').value || 0);
-  const banned = Number(document.getElementById('f-banned').value || 0);
-  const unbanned = Number(document.getElementById('f-unbanned').value || 0);
-  const notes = document.getElementById('f-notes').value.trim();
+  const repeatApil = document.getElementById('f-repeat-apil').checked;
 
-  if(!bm && !zaliv && !apil && !rk){
+  const rawRows = [...document.querySelectorAll('#method-rows-container .method-row')].map(rowEl=>({
+    id: rowEl.dataset.id || '',
+    zaliv: rowEl.querySelector('.m-zaliv').value.trim(),
+    apil: rowEl.querySelector('.m-apil').value.trim(),
+    rk: Number(rowEl.querySelector('.m-rk').value || 0),
+    zalito: Number(rowEl.querySelector('.m-zalito').value || 0),
+    banned: Number(rowEl.querySelector('.m-banned').value || 0),
+    unbanned: Number(rowEl.querySelector('.m-unbanned').value || 0),
+    notes: rowEl.querySelector('.m-notes').value.trim()
+  }));
+
+  const nonEmpty = rawRows.filter(r => r.id || r.zaliv || r.apil || r.rk || r.zalito || r.banned || r.unbanned || r.notes);
+  const methodRows = nonEmpty.length ? nonEmpty : (rawRows.length ? [rawRows[0]] : []);
+
+  if(!bm && !methodRows.length){
     return;
   }
 
-  const id = editingId || uid();
-  const item = {id, dateFrom, dateTo, bm, zaliv, apil, rk, banned, unbanned, notes};
-
   setStatus('Збереження...');
-  await apiPost({action: editingId ? 'update' : 'add', item});
+
+  const groupId = editingGroupKey || uid();
+
+  if(editingGroupKey){
+    const originalIds = entries.filter(e => groupKey(e) === editingGroupKey).map(e=>e.id);
+    const keptIds = methodRows.filter(r=>r.id).map(r=>r.id);
+    const toDelete = originalIds.filter(id => !keptIds.includes(id));
+    for(const id of toDelete){
+      await apiPost({action:'delete', id});
+    }
+  }
+
+  for(const m of methodRows){
+    const isUpdate = !!m.id;
+    const id = m.id || uid();
+    const item = {
+      id, groupId, dateFrom, dateTo, bm, repeatApil,
+      zaliv:m.zaliv, apil:m.apil, rk:m.rk, zalito:m.zalito, banned:m.banned, unbanned:m.unbanned, notes:m.notes
+    };
+    await apiPost({action: isUpdate ? 'update' : 'add', item});
+  }
+
   resetForm();
   await loadEntries();
 });
@@ -457,8 +623,8 @@ document.querySelectorAll('.tab').forEach(tab=>{
 });
 
 document.getElementById('btn-export').addEventListener('click', ()=>{
-  const headers = ['Дата з','Дата по','БМ','Метод заливу','Метод апілу','РК','Забанено','Розбанено','Нотатки'];
-  const rows = entries.map(e=>[e.dateFrom,e.dateTo,e.bm,e.zaliv,e.apil,e.rk,e.banned,e.unbanned,e.notes]);
+  const headers = ['Дата з','Дата по','БМ','Повторний апіл','Метод заливу','Метод апілу','РК','Залито','Забанено','Розбанено','Нотатки'];
+  const rows = entries.map(e=>[e.dateFrom,e.dateTo,e.bm,e.repeatApil?'Так':'Ні',e.zaliv,e.apil,e.rk,e.zalito,e.banned,e.unbanned,e.notes]);
   const csv = [headers, ...rows].map(r=>r.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
@@ -495,6 +661,7 @@ document.getElementById('file-import').addEventListener('change', (e)=>{
         setStatus('Імпорт ' + imported.length + ' записів...');
         for(const item of imported){
           if(!item.id) item.id = uid();
+          if(!item.groupId) item.groupId = item.id;
           await apiPost({action:'add', item});
         }
         await loadEntries();
