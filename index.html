@@ -7,7 +7,7 @@
   :root{
     --bg:#0f1115; --panel:#161920; --panel-2:#1c2028; --border:#262b35;
     --text:#e7e9ee; --text-2:#9aa1b1; --text-3:#5c6373;
-    --accent:#5b9dff; --good:#42d392; --bad:#ff6b6b; --warn:#f5b350;
+    --accent:#5b9dff; --good:#42d392; --bad:#ff6b6b; --warn:#f5b350; --date:#c9a6ff;
     --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
     --sans:"Inter", -apple-system, sans-serif;
   }
@@ -33,14 +33,16 @@
   .field-period .period-row{display:flex; align-items:center; gap:6px; flex-wrap:nowrap;}
   .field-period .period-row input{min-width:0; flex:1;}
   .field-period .period-row span{color:var(--text-3); font-size:12px; flex-shrink:0;}
-  .field-bm{flex:0.8; min-width:100px;}
+  .field-bm{flex:0.9; min-width:110px;}
   .field-method{flex:2.2; min-width:190px;}
   .field-qty{flex:0.5; min-width:70px;}
   .field-qty input{text-align:center;}
+  .field-qty-lg{flex:0.6; min-width:90px;}
+  .field-qty-lg input{text-align:center;}
   .field-notes{flex:2.5; min-width:200px;}
   .field-submit{flex:0 0 140px;}
   @media (max-width:560px){
-    .field-period, .field-bm, .field-method, .field-qty, .field-notes, .field-submit{flex-basis:100%;}
+    .field-period, .field-bm, .field-method, .field-qty, .field-qty-lg, .field-notes, .field-submit{flex-basis:100%;}
   }
   button{
     background:var(--accent); color:#0b1420; border:none; border-radius:6px; font-size:13px; font-weight:600;
@@ -54,6 +56,8 @@
   th{text-align:left; font-size:11px; color:var(--text-2); font-weight:500; text-transform:uppercase; letter-spacing:.03em; padding:6px 10px; border-bottom:1px solid var(--border);}
   td{padding:8px 10px; border-bottom:1px solid var(--border); font-family:var(--mono); vertical-align:middle;}
   tr:hover td{background:var(--panel-2);}
+  #log-table th:first-child, #log-table td:first-child{min-width:120px; white-space:nowrap;}
+  #log-table th:nth-child(2), #log-table td:nth-child(2){min-width:130px;}
   .note-cell{font-family:var(--sans); color:var(--text-2); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 
   .pct-wrap{display:flex; align-items:center; gap:8px;}
@@ -66,7 +70,7 @@
   .name-cell{font-family:var(--sans); font-weight:500;}
   .count-cell{color:var(--text-2); font-size:12px;}
 
-  .toolbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;}
+  .toolbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;}
   .filters{display:flex; gap:8px;}
   .filters select{background:var(--panel-2); border:1px solid var(--border); color:var(--text); font-size:12px; border-radius:6px; padding:6px 8px;}
   .stat-section-title{font-size:13px; font-weight:600; margin:20px 0 10px; color:var(--text);}
@@ -81,6 +85,19 @@
   .checkbox-field input{width:auto; cursor:pointer;}
   .badge-repeat{font-size:10px; background:var(--panel-2); border:1px solid var(--warn); color:var(--warn); border-radius:4px; padding:1px 5px; margin-left:6px; white-space:nowrap; vertical-align:middle;}
   td.bm-cell{vertical-align:top;}
+
+  .info-line{font-size:12px; color:var(--text-2); margin:0 0 14px; padding:10px 12px; background:var(--panel); border:1px solid var(--border); border-radius:8px;}
+  .info-line b{color:var(--text);}
+
+  .bm-stat-card{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:14px;}
+  .bm-stat-header{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:6px;}
+  .bm-stat-header .bm-name{font-size:14px; font-weight:600;}
+  .bm-stat-header .bm-meta{font-size:12px; color:var(--text-2); font-family:var(--mono);}
+  .bm-stat-title{font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--text-2); margin:12px 0 6px;}
+  .bm-stat-title:first-of-type{margin-top:0;}
+  .bm-stat-title.repeat{color:var(--warn);}
+  .show-more-wrap{text-align:center; margin:6px 0 16px;}
+  .date-text{color:var(--date); font-weight:600;}
 </style>
 </head>
 <body>
@@ -101,7 +118,8 @@
 
 <div class="tabs">
   <div class="tab active" data-tab="log">Журнал</div>
-  <div class="tab" data-tab="stats">Статистика</div>
+  <div class="tab" data-tab="bm-stats">Статистика по БМ</div>
+  <div class="tab" data-tab="stats">Загальна статистика</div>
 </div>
 
 <div class="panel active" id="panel-log">
@@ -116,6 +134,8 @@
         </div>
       </div>
       <div class="field field-bm"><label>БМ</label><input type="text" id="f-bm" placeholder="BM-014"></div>
+      <div class="field field-qty-lg"><label>РК (всього)</label><input type="number" id="f-rk" min="0" placeholder="40"></div>
+      <div class="field field-qty-lg"><label>Без країни</label><input type="number" id="f-no-country" min="0" placeholder="0"></div>
       <div class="field" style="flex:0 0 120px;">
         <label style="visibility:hidden;">.</label>
         <label class="checkbox-field">
@@ -157,8 +177,8 @@
       <table id="log-table">
         <thead>
           <tr>
-            <th>Дата</th><th>БМ</th><th>Залив</th><th>Апіл</th>
-            <th>РК</th><th>Залито</th><th>Забанено</th><th>Розбанено</th><th>% розбану</th><th>Нотатки</th><th></th>
+            <th>Дата</th><th>БМ</th><th>РК</th><th>Без країни</th><th>Залив</th><th>Апіл</th>
+            <th>Залито</th><th>Забанено</th><th>Розбанено</th><th>% розбану</th><th>Нотатки</th><th></th>
           </tr>
         </thead>
         <tbody id="log-body"></tbody>
@@ -168,10 +188,20 @@
   </div>
 </div>
 
+<div class="panel" id="panel-bm-stats">
+  <div id="bm-stats-container"></div>
+  <div class="show-more-wrap" id="bm-stats-show-more-wrap" style="display:none;">
+    <button class="secondary" id="btn-bm-show-more">Показати всі</button>
+  </div>
+  <div class="empty" id="bm-stats-empty" style="display:none;">Немає даних</div>
+</div>
+
 <div class="panel" id="panel-stats">
+  <p class="info-line" id="no-country-info"></p>
+
   <div class="stat-section-title">За методом заливу — % акаунтів, що вижили (не забанено)</div>
   <div class="card" style="padding:0;">
-    <table><thead><tr><th>#</th><th>Метод заливу</th><th>Всього РК</th><th>Вижило</th></tr></thead>
+    <table><thead><tr><th>#</th><th>Метод заливу</th><th>Залито</th><th>Вижило</th></tr></thead>
     <tbody id="stats-zaliv"></tbody></table>
     <div class="empty" id="stats-zaliv-empty" style="display:none;">Немає даних</div>
   </div>
@@ -181,13 +211,6 @@
     <table><thead><tr><th>#</th><th>Метод апілу</th><th>Забанено</th><th>Розбанено</th></tr></thead>
     <tbody id="stats-apil"></tbody></table>
     <div class="empty" id="stats-apil-empty" style="display:none;">Немає даних</div>
-  </div>
-
-  <div class="stat-section-title">Повна комбінація (залив + апіл) — % кінцевого виживання РК</div>
-  <div class="card" style="padding:0;">
-    <table><thead><tr><th>#</th><th>Комбінація</th><th>Всього РК</th><th>Живих в підсумку</th></tr></thead>
-    <tbody id="stats-combo"></tbody></table>
-    <div class="empty" id="stats-combo-empty" style="display:none;">Немає даних</div>
   </div>
 
   <div class="stat-section-title repeat">🔁 Повторні апілі (окремо, не входить в основну статистику вище)</div>
@@ -201,6 +224,7 @@
 <script>
 let entries = [];
 let editingGroupKey = null;
+let bmStatsExpanded = false;
 
 function uid(){ return Math.random().toString(36).slice(2,10); }
 
@@ -217,10 +241,6 @@ function pctCell(value, total){
 }
 
 // --- Дата: захист від "лагаючих" дат ---
-// Google Apps Script часто повертає дати як повний ISO datetime (Date-об'єкт із листа),
-// а не як чистий рядок "YYYY-MM-DD". Якщо брати з нього просто перші 10 символів (UTC),
-// дата може "з'їхати" на день назад/вперед через часовий пояс таблиці. Тому тут дата
-// перепарсюється як Date і береться в ЛОКАЛЬНОМУ часовому поясі браузера.
 function normalizeDate(raw){
   if(raw === null || raw === undefined || raw === '') return '';
   const s = String(raw);
@@ -293,9 +313,10 @@ async function loadEntries(){
       dateTo: normalizeDate(r.dateTo),
       bm: r.bm || '',
       repeatApil: toBool(r.repeatApil),
+      rk: Number(r.rk||0),
+      noCountry: Number(r.noCountry||0),
       zaliv: r.zaliv || '',
       apil: r.apil || '',
-      rk: Number(r.rk||0),
       zalito: Number(r.zalito||0),
       banned: Number(r.banned||0),
       unbanned: Number(r.unbanned||0),
@@ -360,10 +381,11 @@ function renderLog(){
         const badge = e.repeatApil ? '<span class="badge-repeat" title="Повторний апіл">🔁 повтор</span>' : '';
         html += `<td class="bm-cell" rowspan="${rowspan}">${fmtPeriod(e)}</td>`;
         html += `<td class="bm-cell" rowspan="${rowspan}">${e.bm||'—'}${badge}</td>`;
+        html += `<td class="bm-cell" rowspan="${rowspan}">${e.rk||0}</td>`;
+        html += `<td class="bm-cell" rowspan="${rowspan}">${e.noCountry||0}</td>`;
       }
       html += `<td class="name-cell">${e.zaliv||'—'}</td>`;
       html += `<td class="name-cell">${e.apil||'—'}</td>`;
-      html += `<td>${e.rk||0}</td>`;
       html += `<td>${e.zalito||0}</td>`;
       html += `<td>${e.banned||0}</td>`;
       html += `<td>${e.unbanned||0}</td>`;
@@ -402,35 +424,76 @@ function groupBy(list, keyFn){
   return map;
 }
 
+// Сума group-level полів (rk, noCountry) без подвоєння, коли в групі кілька методів
+function sumGroupLevel(list, field){
+  const seen = new Set();
+  let total = 0;
+  list.forEach(e=>{
+    const k = groupKey(e);
+    if(seen.has(k)) return;
+    seen.add(k);
+    total += Number(e[field]||0);
+  });
+  return total;
+}
+
+// Діапазон дат для БМ: бере найранішу дату "з" і найпізнішу дату "по" серед усіх його записів
+function bmDateRange(list){
+  const seen = new Set();
+  let allDates = [];
+  list.forEach(e=>{
+    const k = groupKey(e);
+    if(seen.has(k)) return;
+    seen.add(k);
+    if(e.dateFrom) allDates.push(e.dateFrom);
+    if(e.dateTo) allDates.push(e.dateTo);
+  });
+  if(!allDates.length) return '—';
+  allDates.sort();
+  const min = allDates[0];
+  const max = allDates[allDates.length-1];
+  if(min===max) return fmtDate(min);
+  return `${fmtDate(min)}–${fmtDate(max)}`;
+}
+
+function zalivStatsRows(list){
+  const byZaliv = groupBy(list, e=>e.zaliv);
+  return Object.entries(byZaliv).map(([name, rows])=>{
+    const totalZalito = rows.reduce((s,e)=>s+Number(e.zalito||0),0);
+    const totalBanned = rows.reduce((s,e)=>s+Number(e.banned||0),0);
+    const survived = totalZalito - totalBanned;
+    return {name, totalZalito, survived};
+  }).sort((a,b)=> (b.survived/(b.totalZalito||1)) - (a.survived/(a.totalZalito||1)));
+}
+
+function apilStatsRows(list){
+  const byApil = groupBy(list, e=>e.apil);
+  return Object.entries(byApil).map(([name, rows])=>{
+    const totalBanned = rows.reduce((s,e)=>s+Number(e.banned||0),0);
+    const totalUnbanned = rows.reduce((s,e)=>s+Number(e.unbanned||0),0);
+    return {name, totalBanned, totalUnbanned};
+  }).sort((a,b)=> (b.totalUnbanned/(b.totalBanned||1)) - (a.totalUnbanned/(a.totalBanned||1)));
+}
+
 function renderStats(){
-  // Записи з повторним апілом рахуються окремо і не впливають на основну статистику
   const mainEntries = entries.filter(e=>!e.repeatApil);
   const repeatEntries = entries.filter(e=>e.repeatApil);
 
-  const byZaliv = groupBy(mainEntries, e=>e.zaliv);
-  const zalivRows = Object.entries(byZaliv).map(([name, list])=>{
-    const totalRk = list.reduce((s,e)=>s+Number(e.rk||0),0);
-    const totalBanned = list.reduce((s,e)=>s+Number(e.banned||0),0);
-    const survived = totalRk - totalBanned;
-    return {name, count:list.length, totalRk, survived};
-  }).sort((a,b)=> (b.survived/(b.totalRk||1)) - (a.survived/(a.totalRk||1)));
+  const noCountryTotal = sumGroupLevel(mainEntries, 'noCountry');
+  document.getElementById('no-country-info').innerHTML =
+    `Без потрібної країни (не враховано в статистиці): <b>${noCountryTotal}</b> РК`;
 
+  const zalivRows = zalivStatsRows(mainEntries);
   const zBody = document.getElementById('stats-zaliv');
   zBody.innerHTML = zalivRows.map((r,i)=>`<tr>
     <td class="rank">${i+1}</td>
     <td class="name-cell">${r.name}</td>
-    <td class="count-cell">${r.totalRk}</td>
-    <td>${pctCell(r.survived, r.totalRk)}</td>
+    <td class="count-cell">${r.totalZalito}</td>
+    <td>${pctCell(r.survived, r.totalZalito)}</td>
   </tr>`).join('');
   document.getElementById('stats-zaliv-empty').style.display = zalivRows.length ? 'none' : 'block';
 
-  const byApil = groupBy(mainEntries, e=>e.apil);
-  const apilRows = Object.entries(byApil).map(([name, list])=>{
-    const totalBanned = list.reduce((s,e)=>s+Number(e.banned||0),0);
-    const totalUnbanned = list.reduce((s,e)=>s+Number(e.unbanned||0),0);
-    return {name, count:list.length, totalBanned, totalUnbanned};
-  }).sort((a,b)=> (b.totalUnbanned/(b.totalBanned||1)) - (a.totalUnbanned/(a.totalBanned||1)));
-
+  const apilRows = apilStatsRows(mainEntries);
   const aBody = document.getElementById('stats-apil');
   aBody.innerHTML = apilRows.map((r,i)=>`<tr>
     <td class="rank">${i+1}</td>
@@ -440,32 +503,7 @@ function renderStats(){
   </tr>`).join('');
   document.getElementById('stats-apil-empty').style.display = apilRows.length ? 'none' : 'block';
 
-  const byCombo = groupBy(mainEntries, e => (e.zaliv && e.apil) ? `${e.zaliv} + ${e.apil}` : null);
-  const comboRows = Object.entries(byCombo).map(([name, list])=>{
-    const totalRk = list.reduce((s,e)=>s+Number(e.rk||0),0);
-    const totalBanned = list.reduce((s,e)=>s+Number(e.banned||0),0);
-    const totalUnbanned = list.reduce((s,e)=>s+Number(e.unbanned||0),0);
-    const aliveEnd = (totalRk - totalBanned) + totalUnbanned;
-    return {name, count:list.length, totalRk, aliveEnd};
-  }).sort((a,b)=> (b.aliveEnd/(b.totalRk||1)) - (a.aliveEnd/(a.totalRk||1)));
-
-  const cBody = document.getElementById('stats-combo');
-  cBody.innerHTML = comboRows.map((r,i)=>`<tr>
-    <td class="rank">${i+1}</td>
-    <td class="name-cell">${r.name}</td>
-    <td class="count-cell">${r.totalRk}</td>
-    <td>${pctCell(r.aliveEnd, r.totalRk)}</td>
-  </tr>`).join('');
-  document.getElementById('stats-combo-empty').style.display = comboRows.length ? 'none' : 'block';
-
-  // Окрема статистика повторних апілів
-  const byRepeatApil = groupBy(repeatEntries, e=>e.apil);
-  const repeatRows = Object.entries(byRepeatApil).map(([name, list])=>{
-    const totalBanned = list.reduce((s,e)=>s+Number(e.banned||0),0);
-    const totalUnbanned = list.reduce((s,e)=>s+Number(e.unbanned||0),0);
-    return {name, count:list.length, totalBanned, totalUnbanned};
-  }).sort((a,b)=> (b.totalUnbanned/(b.totalBanned||1)) - (a.totalUnbanned/(a.totalBanned||1)));
-
+  const repeatRows = apilStatsRows(repeatEntries);
   const rBody = document.getElementById('stats-repeat-apil');
   rBody.innerHTML = repeatRows.map((r,i)=>`<tr>
     <td class="rank">${i+1}</td>
@@ -476,9 +514,81 @@ function renderStats(){
   document.getElementById('stats-repeat-apil-empty').style.display = repeatRows.length ? 'none' : 'block';
 }
 
+function miniStatsTable(rows, cols){
+  if(!rows.length) return '<div class="empty" style="padding:10px;">Немає даних</div>';
+  const head = `<tr><th>#</th>${cols.map(c=>`<th>${c.label}</th>`).join('')}</tr>`;
+  const body = rows.map((r,i)=>`<tr><td class="rank">${i+1}</td>${cols.map(c=>`<td>${c.render(r)}</td>`).join('')}</tr>`).join('');
+  return `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+
+function renderBmStats(){
+  const mainEntries = entries.filter(e=>!e.repeatApil);
+  const repeatEntriesAll = entries.filter(e=>e.repeatApil);
+  const byBmMain = groupBy(mainEntries, e=>e.bm || '(без назви)');
+  const byBmRepeat = groupBy(repeatEntriesAll, e=>e.bm || '(без назви)');
+  const bmNames = [...new Set([...Object.keys(byBmMain), ...Object.keys(byBmRepeat)])];
+
+  const container = document.getElementById('bm-stats-container');
+  const showMoreWrap = document.getElementById('bm-stats-show-more-wrap');
+  document.getElementById('bm-stats-empty').style.display = bmNames.length ? 'none' : 'block';
+
+  const visibleNames = bmStatsExpanded ? bmNames : bmNames.slice(0, 4);
+
+  container.innerHTML = visibleNames.map(name=>{
+    const rows = byBmMain[name] || [];
+    const repeatRows = byBmRepeat[name] || [];
+    const allRows = rows.concat(repeatRows);
+    const totalRk = sumGroupLevel(allRows, 'rk');
+    const totalNoCountry = sumGroupLevel(allRows, 'noCountry');
+    const dateRange = bmDateRange(allRows);
+
+    const zRows = zalivStatsRows(rows);
+    const aRows = apilStatsRows(rows);
+    const rRows = apilStatsRows(repeatRows);
+
+    const zTable = miniStatsTable(zRows, [
+      {label:'Метод заливу', render:r=>`<span class="name-cell">${r.name}</span>`},
+      {label:'Залито', render:r=>`<span class="count-cell">${r.totalZalito}</span>`},
+      {label:'Вижило', render:r=>pctCell(r.survived, r.totalZalito)}
+    ]);
+    const aTable = miniStatsTable(aRows, [
+      {label:'Метод апілу', render:r=>`<span class="name-cell">${r.name}</span>`},
+      {label:'Забанено', render:r=>`<span class="count-cell">${r.totalBanned}</span>`},
+      {label:'Розбанено', render:r=>pctCell(r.totalUnbanned, r.totalBanned)}
+    ]);
+    const rTable = miniStatsTable(rRows, [
+      {label:'Метод апілу', render:r=>`<span class="name-cell">${r.name}</span>`},
+      {label:'Подано повторно (забанено)', render:r=>`<span class="count-cell">${r.totalBanned}</span>`},
+      {label:'Розбанено', render:r=>pctCell(r.totalUnbanned, r.totalBanned)}
+    ]);
+
+    return `<div class="bm-stat-card">
+      <div class="bm-stat-header">
+        <span class="bm-name">${name}</span>
+        <span class="bm-meta">Дата: <span class="date-text">${dateRange}</span> · РК: ${totalRk} · Без країни: ${totalNoCountry}</span>
+      </div>
+      <div class="bm-stat-title">За методом заливу</div>
+      ${zTable}
+      <div class="bm-stat-title">За методом апілу</div>
+      ${aTable}
+      <div class="bm-stat-title repeat">🔁 Повторні апілі (окремо)</div>
+      ${rTable}
+    </div>`;
+  }).join('');
+
+  showMoreWrap.style.display = bmNames.length > 4 ? 'block' : 'none';
+  document.getElementById('btn-bm-show-more').textContent = bmStatsExpanded ? 'Згорнути' : 'Показати всі';
+}
+
+document.getElementById('btn-bm-show-more').addEventListener('click', ()=>{
+  bmStatsExpanded = !bmStatsExpanded;
+  renderBmStats();
+});
+
 function render(){
   renderLog();
   renderStats();
+  renderBmStats();
 }
 
 window.removeEntry = async function(id){
@@ -494,7 +604,6 @@ function methodRowTemplate(m){
   return `<div class="method-row" data-id="${m.id||''}">
     <div class="field field-method"><label>Метод заливу</label><input type="text" class="m-zaliv" list="zaliv-list" value="${(m.zaliv||'').replace(/"/g,'&quot;')}"></div>
     <div class="field field-method"><label>Метод апілу</label><input type="text" class="m-apil" list="apil-list" value="${(m.apil||'').replace(/"/g,'&quot;')}"></div>
-    <div class="field field-qty"><label>РК</label><input type="number" class="m-rk" min="0" value="${m.rk||''}"></div>
     <div class="field field-qty"><label>Залито</label><input type="number" class="m-zalito" min="0" value="${m.zalito||''}"></div>
     <div class="field field-qty"><label>Забанено</label><input type="number" class="m-banned" min="0" value="${m.banned||''}"></div>
     <div class="field field-qty"><label>Розбанено</label><input type="number" class="m-unbanned" min="0" value="${m.unbanned||''}"></div>
@@ -539,8 +648,10 @@ window.startEditGroup = function(key){
   document.getElementById('f-date-from').value = first.dateFrom||'';
   document.getElementById('f-date-to').value = first.dateTo||'';
   document.getElementById('f-bm').value = first.bm||'';
+  document.getElementById('f-rk').value = first.rk||'';
+  document.getElementById('f-no-country').value = first.noCountry||'';
   document.getElementById('f-repeat-apil').checked = !!first.repeatApil;
-  setMethodRows(rows.map(e=>({id:e.id, zaliv:e.zaliv, apil:e.apil, rk:e.rk, zalito:e.zalito, banned:e.banned, unbanned:e.unbanned, notes:e.notes})));
+  setMethodRows(rows.map(e=>({id:e.id, zaliv:e.zaliv, apil:e.apil, zalito:e.zalito, banned:e.banned, unbanned:e.unbanned, notes:e.notes})));
   document.getElementById('btn-add').textContent = 'Зберегти зміни';
   document.getElementById('btn-cancel-edit').style.display = 'inline-flex';
   document.getElementById('btn-add').scrollIntoView({behavior:'smooth', block:'center'});
@@ -548,7 +659,7 @@ window.startEditGroup = function(key){
 
 function resetForm(){
   editingGroupKey = null;
-  ['f-bm','f-date-from','f-date-to'].forEach(id=>{ document.getElementById(id).value=''; });
+  ['f-bm','f-date-from','f-date-to','f-rk','f-no-country'].forEach(id=>{ document.getElementById(id).value=''; });
   document.getElementById('f-repeat-apil').checked = false;
   setMethodRows([{}]);
   document.getElementById('btn-add').textContent = 'Додати запис';
@@ -563,23 +674,24 @@ document.getElementById('btn-add').addEventListener('click', async ()=>{
   const dateFrom = document.getElementById('f-date-from').value;
   const dateTo = document.getElementById('f-date-to').value;
   const bm = document.getElementById('f-bm').value.trim();
+  const rk = Number(document.getElementById('f-rk').value || 0);
+  const noCountry = Number(document.getElementById('f-no-country').value || 0);
   const repeatApil = document.getElementById('f-repeat-apil').checked;
 
   const rawRows = [...document.querySelectorAll('#method-rows-container .method-row')].map(rowEl=>({
     id: rowEl.dataset.id || '',
     zaliv: rowEl.querySelector('.m-zaliv').value.trim(),
     apil: rowEl.querySelector('.m-apil').value.trim(),
-    rk: Number(rowEl.querySelector('.m-rk').value || 0),
     zalito: Number(rowEl.querySelector('.m-zalito').value || 0),
     banned: Number(rowEl.querySelector('.m-banned').value || 0),
     unbanned: Number(rowEl.querySelector('.m-unbanned').value || 0),
     notes: rowEl.querySelector('.m-notes').value.trim()
   }));
 
-  const nonEmpty = rawRows.filter(r => r.id || r.zaliv || r.apil || r.rk || r.zalito || r.banned || r.unbanned || r.notes);
+  const nonEmpty = rawRows.filter(r => r.id || r.zaliv || r.apil || r.zalito || r.banned || r.unbanned || r.notes);
   const methodRows = nonEmpty.length ? nonEmpty : (rawRows.length ? [rawRows[0]] : []);
 
-  if(!bm && !methodRows.length){
+  if(!bm && !rk && !methodRows.length){
     return;
   }
 
@@ -600,8 +712,8 @@ document.getElementById('btn-add').addEventListener('click', async ()=>{
     const isUpdate = !!m.id;
     const id = m.id || uid();
     const item = {
-      id, groupId, dateFrom, dateTo, bm, repeatApil,
-      zaliv:m.zaliv, apil:m.apil, rk:m.rk, zalito:m.zalito, banned:m.banned, unbanned:m.unbanned, notes:m.notes
+      id, groupId, dateFrom, dateTo, bm, rk, noCountry, repeatApil,
+      zaliv:m.zaliv, apil:m.apil, zalito:m.zalito, banned:m.banned, unbanned:m.unbanned, notes:m.notes
     };
     await apiPost({action: isUpdate ? 'update' : 'add', item});
   }
@@ -623,8 +735,8 @@ document.querySelectorAll('.tab').forEach(tab=>{
 });
 
 document.getElementById('btn-export').addEventListener('click', ()=>{
-  const headers = ['Дата з','Дата по','БМ','Повторний апіл','Метод заливу','Метод апілу','РК','Залито','Забанено','Розбанено','Нотатки'];
-  const rows = entries.map(e=>[e.dateFrom,e.dateTo,e.bm,e.repeatApil?'Так':'Ні',e.zaliv,e.apil,e.rk,e.zalito,e.banned,e.unbanned,e.notes]);
+  const headers = ['Дата з','Дата по','БМ','РК','Без країни','Повторний апіл','Метод заливу','Метод апілу','Залито','Забанено','Розбанено','Нотатки'];
+  const rows = entries.map(e=>[e.dateFrom,e.dateTo,e.bm,e.rk,e.noCountry,e.repeatApil?'Так':'Ні',e.zaliv,e.apil,e.zalito,e.banned,e.unbanned,e.notes]);
   const csv = [headers, ...rows].map(r=>r.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
