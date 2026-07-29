@@ -144,6 +144,13 @@
       <button id="btn-save-url" style="flex:0 0 auto;">Зберегти</button>
     </div>
   </div>
+  <div class="field" style="max-width:640px; margin-top:10px;">
+    <label>Ключ редагування (тільки твій, ніхто інший його не бачить і не вводить)</label>
+    <div style="display:flex; gap:8px;">
+      <input type="password" id="f-edit-key" placeholder="секретний ключ для редагування">
+      <button id="btn-save-key" style="flex:0 0 auto;">Зберегти</button>
+    </div>
+  </div>
   <p id="sync-status" style="font-size:12px; color:var(--text-2); margin:10px 0 0;"></p>
 </div>
 
@@ -302,8 +309,10 @@ function fmtPeriod(e){
 }
 
 const CONFIG_KEY = 'gsheet-script-url';
+const EDIT_KEY_STORAGE = 'gsheet-edit-key';
 const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzFtqnzUmnV_MAq0pL00JjVAV79y1VXSYvY-VI2zYTjOa5Qy4HRfXC9eU7E9IlTgDLw/exec';
 let SCRIPT_URL = localStorage.getItem(CONFIG_KEY) || DEFAULT_SCRIPT_URL;
+let EDIT_KEY = localStorage.getItem(EDIT_KEY_STORAGE) || '';
 
 function setStatus(msg, isError){
   const el = document.getElementById('sync-status');
@@ -321,12 +330,12 @@ async function apiPost(payload){
   const res = await fetch(SCRIPT_URL, {
     method: 'POST',
     headers: {'Content-Type': 'text/plain;charset=utf-8'},
-    body: JSON.stringify(payload)
+    body: JSON.stringify({...payload, editKey: EDIT_KEY})
   });
   try{
     const data = await res.json();
     if(data.status === 'error'){
-      setStatus(data.message || 'Помилка збереження.', true);
+      setStatus(data.message || 'Немає прав на редагування. Перевір ключ.', true);
       return false;
     }
   }catch(e){}
@@ -372,6 +381,13 @@ document.getElementById('btn-save-url').addEventListener('click', ()=>{
   SCRIPT_URL = url;
   localStorage.setItem(CONFIG_KEY, url);
   loadEntries();
+});
+document.getElementById('f-edit-key').value = EDIT_KEY;
+document.getElementById('btn-save-key').addEventListener('click', ()=>{
+  const key = document.getElementById('f-edit-key').value.trim();
+  EDIT_KEY = key;
+  localStorage.setItem(EDIT_KEY_STORAGE, key);
+  setStatus('Ключ збережено на цьому пристрої.');
 });
 document.getElementById('btn-refresh').addEventListener('click', loadEntries);
 document.getElementById('btn-toggle-all').addEventListener('click', ()=>{
