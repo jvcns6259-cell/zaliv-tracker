@@ -148,6 +148,7 @@
 </div>
 
 <div class="kpi-row" id="kpi-container"></div>
+<div class="kpi-row" id="kpi-repeat-container"></div>
 
 <div class="tabs">
   <div class="tab active" data-tab="log">Журнал</div>
@@ -245,6 +246,8 @@
     <tbody id="stats-repeat-apil"></tbody></table>
     <div class="empty" id="stats-repeat-apil-empty" style="display:none;">Немає даних</div>
   </div>
+  <div class="bm-stat-title repeat" style="margin-top:-6px;">Хронологія повторних апілів (дата, метод, нотатки)</div>
+  <div class="card repeat-card" id="stats-repeat-chronology"></div>
 </div>
 
 <script>
@@ -315,11 +318,19 @@ async function apiGet(){
 }
 
 async function apiPost(payload){
-  await fetch(SCRIPT_URL, {
+  const res = await fetch(SCRIPT_URL, {
     method: 'POST',
     headers: {'Content-Type': 'text/plain;charset=utf-8'},
     body: JSON.stringify(payload)
   });
+  try{
+    const data = await res.json();
+    if(data.status === 'error'){
+      setStatus(data.message || 'Помилка збереження.', true);
+      return false;
+    }
+  }catch(e){}
+  return true;
 }
 
 async function loadEntries(){
@@ -565,6 +576,11 @@ function renderStats(){
     <td class="count-cell">${r.totalZalito}</td>
     <td>${pctCell(r.survived, r.totalZalito)}</td>
   </tr>`).join('');
+  if(zalivRows.length){
+    const sumZalito = zalivRows.reduce((s,r)=>s+r.totalZalito,0);
+    const sumSurvived = zalivRows.reduce((s,r)=>s+r.survived,0);
+    zBody.innerHTML += totalsRow([sumZalito, pctCell(sumSurvived, sumZalito)]);
+  }
   document.getElementById('stats-zaliv-empty').style.display = zalivRows.length ? 'none' : 'block';
 
   const apilRows = apilStatsRows(mainEntries);
@@ -575,6 +591,11 @@ function renderStats(){
     <td class="text-bad">${r.totalBanned}</td>
     <td>${pctCell(r.totalUnbanned, r.totalBanned)}</td>
   </tr>`).join('');
+  if(apilRows.length){
+    const sumBanned = apilRows.reduce((s,r)=>s+r.totalBanned,0);
+    const sumUnbanned = apilRows.reduce((s,r)=>s+r.totalUnbanned,0);
+    aBody.innerHTML += totalsRow([sumBanned, pctCell(sumUnbanned, sumBanned)]);
+  }
   document.getElementById('stats-apil-empty').style.display = apilRows.length ? 'none' : 'block';
 
   const repeatRows = apilStatsRows(repeatEntries);
@@ -585,7 +606,14 @@ function renderStats(){
     <td class="text-bad">${r.totalBanned}</td>
     <td>${pctCell(r.totalUnbanned, r.totalBanned)}</td>
   </tr>`).join('');
+  if(repeatRows.length){
+    const sumBanned = repeatRows.reduce((s,r)=>s+r.totalBanned,0);
+    const sumUnbanned = repeatRows.reduce((s,r)=>s+r.totalUnbanned,0);
+    rBody.innerHTML += totalsRow([sumBanned, pctCell(sumUnbanned, sumBanned)]);
+  }
   document.getElementById('stats-repeat-apil-empty').style.display = repeatRows.length ? 'none' : 'block';
+
+  document.getElementById('stats-repeat-chronology').innerHTML = repeatChronologyTable(repeatEntries, true);
 }
 
 function miniStatsTable(rows, cols){
@@ -610,6 +638,34 @@ function bmChronologyTable(rows){
     <td>${pctCell(e.unbanned, e.banned)}</td>
   </tr>`).join('');
   return `<div style="overflow-x:auto;"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+}
+
+// Хронологія повторних апілів — з датою і нотатками (окремо, бо треба бачити коли саме подавали)
+function repeatChronologyTable(rows, includeBm){
+  if(!rows.length) return '<div class="empty" style="padding:10px;">Немає даних</div>';
+  const sorted = [...rows].sort((a,b)=> (a.dateFrom||'').localeCompare(b.dateFrom||''));
+  const bmHead = includeBm ? '<th>БМ</th>' : '';
+  const head = `<tr><th>Дата</th>${bmHead}<th>Метод апілу</th><th>Забанено</th><th>Розбанено</th><th>% розбану</th><th>Нотатки</th></tr>`;
+  const body = sorted.map(e=>{
+    const bmCell = includeBm ? `<td class="name-cell">${e.bm||'—'}</td>` : '';
+    return `<tr>
+      <td class="date-text" style="white-space:nowrap;">${fmtPeriod(e)}</td>
+      ${bmCell}
+      <td class="name-cell">${e.apil||'—'}</td>
+      <td class="text-bad">${e.banned||0}</td>
+      <td class="text-good">${e.unbanned||0}</td>
+      <td>${pctCell(e.unbanned, e.banned)}</td>
+      <td class="note-cell" title="${(e.notes||'').replace(/"/g,'&quot;')}">${e.notes||''}</td>
+    </tr>`;
+  }).join('');
+  return `<div style="overflow-x:auto;"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+}
+
+// Підсумковий рядок "Разом" в кінці таблиці статистики
+function totalsRow(cols){
+  return `<tr style="font-weight:600; border-top:2px solid var(--border);">
+    <td></td><td>Разом</td>${cols.map(c=>`<td>${c}</td>`).join('')}
+  </tr>`;
 }
 
 function renderBmStats(){
@@ -660,9 +716,10 @@ function renderBmStats(){
         <span class="bm-name">🔁 ${name} — повторні апілі</span>
       </div>
       ${rTable}
+      ${repeatChronologyTable(repeatRows, false)}
     </div>` : '';
 
-    return `<div class="bm-stat-card">
+    const mainCard = rows.length ? `<div class="bm-stat-card">
       <div class="bm-stat-header">
         <span class="bm-name">${name}</span>
         <span class="bm-meta">РК: ${totalRk} · Без країни: ${totalNoCountry} · Живих РК: ${aliveRk}</span>
@@ -672,7 +729,9 @@ function renderBmStats(){
       ${zTable}
       <div class="bm-stat-title">За методом апілу</div>
       ${aTable}
-    </div>${repeatCard}`;
+    </div>` : '';
+
+    return `${mainCard}${repeatCard}`;
   }).join('');
 
   showMoreWrap.style.display = bmNames.length > 4 ? 'block' : 'none';
@@ -686,14 +745,21 @@ document.getElementById('btn-bm-show-more').addEventListener('click', ()=>{
 
 function renderDashboard(){
   const mainEntries = entries.filter(e=>!e.repeatApil);
+  const repeatEntries = entries.filter(e=>e.repeatApil);
+
   const totalRk = sumGroupLevel(mainEntries, 'rk');
   const totalNoCountry = sumGroupLevel(mainEntries, 'noCountry');
   const totalZalito = mainEntries.reduce((s,e)=>s+Number(e.zalito||0),0);
   const totalBanned = mainEntries.reduce((s,e)=>s+Number(e.banned||0),0);
-  const totalUnbanned = mainEntries.reduce((s,e)=>s+Number(e.unbanned||0),0);
+  const totalUnbannedMain = mainEntries.reduce((s,e)=>s+Number(e.unbanned||0),0);
+  const totalUnbannedRepeat = repeatEntries.reduce((s,e)=>s+Number(e.unbanned||0),0);
+  const totalUnbannedAll = totalUnbannedMain + totalUnbannedRepeat;
   const aliveRk = Math.max(0, totalRk - totalBanned - totalNoCountry);
   const bmCount = new Set(mainEntries.map(e=>e.bm).filter(Boolean)).size;
   const survivalPct = totalZalito ? Math.round(((totalZalito - totalBanned) / totalZalito) * 100) : null;
+
+  const repeatBanned = repeatEntries.reduce((s,e)=>s+Number(e.banned||0),0);
+  const repeatPct = repeatBanned ? Math.round((totalUnbannedRepeat / repeatBanned) * 100) : null;
 
   const cards = [
     {label:'БМ', value: bmCount},
@@ -701,7 +767,7 @@ function renderDashboard(){
     {label:'Живих РК', value: aliveRk, color: totalRk ? pctColor(Math.round((aliveRk/totalRk)*100)) : null},
     {label:'Залито', value: totalZalito},
     {label:'Забанено', value: totalBanned, color:'var(--bad)'},
-    {label:'Розбанено', value: totalUnbanned, color:'var(--good)'},
+    {label:'Розбанено (всього)', value: totalUnbannedAll, color:'var(--good)'},
     {label:'% виживання заливу', value: survivalPct===null ? '—' : survivalPct+'%', color: survivalPct===null ? null : pctColor(survivalPct)}
   ];
 
@@ -711,6 +777,18 @@ function renderDashboard(){
       <div class="kpi-value" style="${c.color ? 'color:'+c.color : ''}">${c.value}</div>
     </div>
   `).join('');
+
+  const repeatCards = [
+    {label:'Повторних апілів подано', value: repeatBanned, color:'var(--bad)'},
+    {label:'Розбанено повторно', value: totalUnbannedRepeat, color:'var(--good)'},
+    {label:'% розбану повторних', value: repeatPct===null ? '—' : repeatPct+'%', color: repeatPct===null ? null : pctColor(repeatPct)}
+  ];
+  document.getElementById('kpi-repeat-container').innerHTML = repeatBanned ? repeatCards.map(c=>`
+    <div class="kpi-card">
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value" style="${c.color ? 'color:'+c.color : ''}">${c.value}</div>
+    </div>
+  `).join('') : '';
 }
 
 function render(){
@@ -723,7 +801,8 @@ function render(){
 window.removeEntry = async function(id){
   if(!SCRIPT_URL){ setStatus('Спочатку встав URL Apps Script.', true); return; }
   setStatus('Видалення...');
-  await apiPost({action:'delete', id});
+  const ok = await apiPost({action:'delete', id});
+  if(!ok) return;
   await loadEntries();
 }
 
@@ -840,7 +919,8 @@ document.getElementById('btn-add').addEventListener('click', async ()=>{
     const keptIds = methodRows.filter(r=>r.id).map(r=>r.id);
     const toDelete = originalIds.filter(id => !keptIds.includes(id));
     for(const id of toDelete){
-      await apiPost({action:'delete', id});
+      const ok = await apiPost({action:'delete', id});
+      if(!ok) return;
     }
   }
 
@@ -851,7 +931,8 @@ document.getElementById('btn-add').addEventListener('click', async ()=>{
       id, groupId, dateFrom:m.dateFrom, dateTo:m.dateTo, bm, rk, noCountry, repeatApil,
       zaliv:m.zaliv, apil:m.apil, zalito:m.zalito, banned:m.banned, unbanned:m.unbanned, notes:m.notes
     };
-    await apiPost({action: isUpdate ? 'update' : 'add', item});
+    const ok = await apiPost({action: isUpdate ? 'update' : 'add', item});
+    if(!ok) return;
   }
 
   resetForm();
